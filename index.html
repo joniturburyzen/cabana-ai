@@ -136,8 +136,8 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 const RPM_AVATAR_URL = 'https://models.readyplayer.me/TU_ID_AQUI.glb?morphTargets=ARKit&lod=1';
 // Obtén tu ID en https://readyplayer.me — ejemplo: 6835abc123def456789
 
-const GROQ_API_KEY   = 'gsk_TU_KEY_AQUI';
-// Obtén tu key en https://console.groq.com
+const WORKER_URL     = 'https://empty-silence-364e.joniturbu.workers.dev/';
+// Cloudflare Worker que proxea Groq — la API key vive en el Worker, no aquí
 
 const SYSTEM_PROMPT  = `Eres un personaje misterioso que vive en una cabaña en el bosque.
 Hablas de forma concisa, con cierto misticismo. Respondes en español.
@@ -365,12 +365,9 @@ async function askGroq(userText) {
   const typingDiv = addMessage('…', 'avatar typing');
 
   try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const res = await fetch(WORKER_URL, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages: chatHistory,
