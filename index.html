@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cabaña AI</title>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three":             "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+      "three/addons/":     "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+
+    canvas { display: block; }
+
+    /* ─── Loading screen ─────────────────────────────────── */
+    #loading {
+      position: fixed; inset: 0;
+      background: #0d0a07;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 100; gap: 18px;
+    }
+    #loading h1 { color: #e8c87a; font-size: 2rem; letter-spacing: .1em; }
+    #loading p  { color: #a08060; font-size: .9rem; }
+    #bar-wrap {
+      width: 260px; height: 6px;
+      background: #2a2010; border-radius: 3px; overflow: hidden;
+    }
+    #bar { height: 100%; width: 0%; background: #e8c87a; transition: width .3s; }
+
+    /* ─── Chat panel ─────────────────────────────────────── */
+    #chat-panel {
+      position: fixed; bottom: 24px; right: 24px;
+      width: 340px;
+      background: rgba(10, 7, 3, .82);
+      border: 1px solid rgba(232,200,122,.25);
+      border-radius: 16px;
+      backdrop-filter: blur(12px);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,.6);
+      z-index: 10;
+    }
+    #chat-header {
+      padding: 10px 16px;
+      background: rgba(232,200,122,.08);
+      border-bottom: 1px solid rgba(232,200,122,.15);
+      color: #e8c87a; font-size: .85rem; font-weight: 600;
+      letter-spacing: .05em;
+    }
+    #messages {
+      flex: 1; max-height: 300px;
+      overflow-y: auto; padding: 12px;
+      display: flex; flex-direction: column; gap: 8px;
+      scrollbar-width: thin; scrollbar-color: #3a2a10 transparent;
+    }
+    .msg {
+      max-width: 88%; padding: 8px 12px;
+      border-radius: 12px; font-size: .84rem; line-height: 1.45;
+      word-break: break-word;
+    }
+    .msg.user {
+      align-self: flex-end;
+      background: rgba(232,200,122,.18);
+      color: #f0dca0;
+      border-bottom-right-radius: 4px;
+    }
+    .msg.avatar {
+      align-self: flex-start;
+      background: rgba(80,50,20,.5);
+      color: #d4b888;
+      border-bottom-left-radius: 4px;
+    }
+    .msg.typing { font-style: italic; opacity: .65; }
+
+    #input-row {
+      display: flex; gap: 8px; padding: 10px 12px;
+      border-top: 1px solid rgba(232,200,122,.12);
+    }
+    #user-input {
+      flex: 1; background: rgba(255,255,255,.06);
+      border: 1px solid rgba(232,200,122,.2);
+      border-radius: 8px; padding: 8px 12px;
+      color: #f0dca0; font-size: .84rem; outline: none;
+      resize: none; min-height: 36px; max-height: 80px;
+    }
+    #user-input::placeholder { color: rgba(232,200,122,.35); }
+    #send-btn {
+      background: rgba(232,200,122,.2);
+      border: 1px solid rgba(232,200,122,.3);
+      border-radius: 8px; padding: 0 14px;
+      color: #e8c87a; font-size: 1.1rem; cursor: pointer;
+      transition: background .15s;
+    }
+    #send-btn:hover { background: rgba(232,200,122,.35); }
+    #send-btn:disabled { opacity: .4; cursor: default; }
+  </style>
+</head>
+<body>
+
+<!-- ═══ Loading screen ══════════════════════════════════════════ -->
+<div id="loading">
+  <h1>Cabaña AI</h1>
+  <p id="load-status">Iniciando…</p>
+  <div id="bar-wrap"><div id="bar"></div></div>
+</div>
+
+<!-- ═══ Chat panel ══════════════════════════════════════════════ -->
+<div id="chat-panel">
+  <div id="chat-header">💬 Habla con el avatar</div>
+  <div id="messages"></div>
+  <div id="input-row">
+    <textarea id="user-input" rows="1" placeholder="Escribe algo…"></textarea>
+    <button id="send-btn">➤</button>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader }    from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader }   from 'three/addons/loaders/DRACOLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
+/* ═══════════════════════════════════════════════════════════════
+   ▼▼▼  CONFIGURA AQUÍ  ▼▼▼
+   ═══════════════════════════════════════════════════════════════ */
+
+const RPM_AVATAR_URL = 'https://models.readyplayer.me/TU_ID_AQUI.glb?morphTargets=ARKit&lod=1';
+// Obtén tu ID en https://readyplayer.me — ejemplo: 6835abc123def456789
+
+const GROQ_API_KEY   = 'gsk_TU_KEY_AQUI';
+// Obtén tu key en https://console.groq.com
+
+const SYSTEM_PROMPT  = `Eres un personaje misterioso que vive en una cabaña en el bosque.
+Hablas de forma concisa, con cierto misticismo. Respondes en español.
+Máximo 2-3 oraciones por respuesta.`;
+
+// URL pública del paquete de animaciones Ready Player Me (Idle + Talking)
+const RPM_IDLE_ANIM_URL    = 'https://readyplayer.me/api/avatars/animations/idle.glb';
+const RPM_TALKING_ANIM_URL = 'https://readyplayer.me/api/avatars/animations/talking.glb';
+
+// Fallback: animaciones de Mixamo si las RPM no cargan
+const MIXAMO_IDLE_URL    = 'https://cdn.jsdelivr.net/gh/nicktarnold/RPM-animation-sample-files@main/idle.glb';
+const MIXAMO_TALKING_URL = 'https://cdn.jsdelivr.net/gh/nicktarnold/RPM-animation-sample-files@main/talking.glb';
+
+/* ═══════════════════════════════════════════════════════════════ */
+
+// ─── Utilidades de UI ──────────────────────────────────────────
+const $loadStatus = document.getElementById('load-status');
+const $bar        = document.getElementById('bar');
+const $loading    = document.getElementById('loading');
+const $messages   = document.getElementById('messages');
+const $input      = document.getElementById('user-input');
+const $sendBtn    = document.getElementById('send-btn');
+
+function setProgress(pct, label) {
+  $bar.style.width = pct + '%';
+  if (label) $loadStatus.textContent = label;
+}
+
+function hideLoading() {
+  $loading.style.transition = 'opacity .6s';
+  $loading.style.opacity    = '0';
+  setTimeout(() => $loading.style.display = 'none', 700);
+}
+
+function addMessage(text, role) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  div.textContent = text;
+  $messages.appendChild(div);
+  $messages.scrollTop = $messages.scrollHeight;
+  return div;
+}
+
+// ─── Three.js setup ───────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace   = THREE.SRGBColorSpace;
+renderer.toneMapping        = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+document.body.insertBefore(renderer.domElement, document.body.firstChild);
+
+const scene  = new THREE.Scene();
+scene.background = new THREE.Color(0x0d0a07);
+scene.fog        = new THREE.FogExp2(0x0d0a07, 0.035);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(0, 1.65, 3.2);
+camera.lookAt(0, 1.4, 0);
+
+// Luz ambiente suave
+const ambLight = new THREE.AmbientLight(0xfff0d0, 0.6);
+scene.add(ambLight);
+
+// Luz puntual tipo vela/chimenea
+const fireLight = new THREE.PointLight(0xff8c30, 2.5, 6);
+fireLight.position.set(-1.5, 1.2, -0.5);
+fireLight.castShadow = true;
+scene.add(fireLight);
+
+// Luz direccional suave desde arriba
+const dirLight = new THREE.DirectionalLight(0xfff5e0, 0.8);
+dirLight.position.set(2, 4, 2);
+dirLight.castShadow = true;
+scene.add(dirLight);
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ─── DRACO loader ─────────────────────────────────────────────
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/libs/draco/');
+
+const loader = new GLTFLoader();
+loader.setDRACOLoader(dracoLoader);
+
+// ─── Animaciones / mixer ───────────────────────────────────────
+let mixer      = null;
+let idleAction = null;
+let talkAction = null;
+let talkTimer  = null;
+
+function startTalking(textLength) {
+  if (!mixer || !talkAction) return;
+  const duration = Math.max(2, Math.min(textLength * 0.065, 8)); // 2–8 s
+  clearTimeout(talkTimer);
+  if (idleAction) idleAction.crossFadeTo(talkAction, 0.3, false);
+  talkAction.reset().play();
+  talkTimer = setTimeout(stopTalking, duration * 1000);
+}
+
+function stopTalking() {
+  if (!mixer || !idleAction) return;
+  if (talkAction) talkAction.crossFadeTo(idleAction, 0.5, false);
+  idleAction.reset().play();
+}
+
+// ─── Carga de la cabana ───────────────────────────────────────
+async function loadCabin() {
+  setProgress(5, 'Cargando cabaña…');
+  return new Promise((resolve, reject) => {
+    loader.load(
+      'RECURSOS/caba%C3%B1apruebainterior.glb',
+      (gltf) => {
+        const cabin = gltf.scene;
+        cabin.scale.setScalar(1);
+        cabin.position.set(0, 0, 0);
+        cabin.traverse(node => {
+          if (node.isMesh) {
+            node.castShadow    = true;
+            node.receiveShadow = true;
+          }
+        });
+        scene.add(cabin);
+        setProgress(40, 'Cabaña cargada');
+        resolve();
+      },
+      (xhr) => {
+        if (xhr.total) {
+          const pct = 5 + (xhr.loaded / xhr.total) * 35;
+          setProgress(pct, `Cabaña: ${Math.round(pct - 5)}%`);
+        }
+      },
+      reject
+    );
+  });
+}
+
+// ─── Carga del avatar RPM ─────────────────────────────────────
+async function loadAvatar() {
+  setProgress(42, 'Cargando avatar…');
+  return new Promise((resolve, reject) => {
+    loader.load(
+      RPM_AVATAR_URL,
+      (gltf) => {
+        const avatarScene = gltf.scene;
+        const wrapper     = new THREE.Group();
+        wrapper.position.set(0, 0, 0.4);     // ligeramente hacia cámara
+        wrapper._inner = avatarScene;
+        avatarScene.scale.setScalar(1);
+        avatarScene.rotation.y = Math.PI;    // mirar a cámara
+        avatarScene.traverse(node => {
+          if (node.isMesh) {
+            node.castShadow    = true;
+            node.receiveShadow = true;
+          }
+        });
+        wrapper.add(avatarScene);
+        scene.add(wrapper);
+        mixer = new THREE.AnimationMixer(avatarScene);
+        setProgress(70, 'Avatar cargado');
+        resolve({ wrapper, avatarScene, clips: gltf.animations });
+      },
+      (xhr) => {
+        if (xhr.total) {
+          const pct = 42 + (xhr.loaded / xhr.total) * 25;
+          setProgress(pct, `Avatar: ${Math.round(pct - 42)}%`);
+        }
+      },
+      (err) => {
+        console.warn('Avatar RPM no se pudo cargar:', err);
+        setProgress(70, 'Avatar (placeholder)');
+        resolve({ wrapper: null, avatarScene: null, clips: [] }); // continúa sin avatar
+      }
+    );
+  });
+}
+
+// ─── Carga de animaciones RPM ─────────────────────────────────
+async function loadAnimation(url) {
+  return new Promise((resolve) => {
+    loader.load(url, (gltf) => resolve(gltf.animations), undefined, () => resolve([]));
+  });
+}
+
+async function loadAnimations(avatarScene) {
+  setProgress(72, 'Cargando animaciones…');
+
+  // Intenta RPM primero, luego fallback Mixamo
+  let idleClips    = await loadAnimation(RPM_IDLE_ANIM_URL);
+  let talkingClips = await loadAnimation(RPM_TALKING_ANIM_URL);
+
+  if (!idleClips.length)    idleClips    = await loadAnimation(MIXAMO_IDLE_URL);
+  if (!talkingClips.length) talkingClips = await loadAnimation(MIXAMO_TALKING_URL);
+
+  setProgress(90, 'Animaciones listas');
+
+  if (!avatarScene || !mixer) return;
+
+  if (idleClips.length) {
+    const clip   = SkeletonUtils.retargetClip(avatarScene, avatarScene, idleClips[0]);
+    idleAction   = mixer.clipAction(clip);
+    idleAction.setLoop(THREE.LoopRepeat);
+    idleAction.play();
+  }
+
+  if (talkingClips.length) {
+    const clip   = SkeletonUtils.retargetClip(avatarScene, avatarScene, talkingClips[0]);
+    talkAction   = mixer.clipAction(clip);
+    talkAction.setLoop(THREE.LoopRepeat);
+    if (idleAction) talkAction.weight = 0;
+  }
+}
+
+// ─── Groq API ─────────────────────────────────────────────────
+const chatHistory = [{ role: 'system', content: SYSTEM_PROMPT }];
+
+async function askGroq(userText) {
+  chatHistory.push({ role: 'user', content: userText });
+  const typingDiv = addMessage('…', 'avatar typing');
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: chatHistory,
+        max_tokens: 200,
+        temperature: 0.8
+      })
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data    = await res.json();
+    const replyTx = data.choices[0].message.content.trim();
+    chatHistory.push({ role: 'assistant', content: replyTx });
+
+    typingDiv.classList.remove('typing');
+    typingDiv.textContent = replyTx;
+    $messages.scrollTop   = $messages.scrollHeight;
+    startTalking(replyTx.length);
+    return replyTx;
+
+  } catch (err) {
+    typingDiv.textContent = `[Error: ${err.message}]`;
+    typingDiv.classList.remove('typing');
+    console.error('Groq error:', err);
+  }
+}
+
+// ─── Chat UI logic ────────────────────────────────────────────
+async function handleSend() {
+  const text = $input.value.trim();
+  if (!text) return;
+  $input.value  = '';
+  $sendBtn.disabled = true;
+  addMessage(text, 'user');
+  await askGroq(text);
+  $sendBtn.disabled = false;
+  $input.focus();
+}
+
+$sendBtn.addEventListener('click', handleSend);
+$input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+});
+
+// ─── Parpadeo de fuego ────────────────────────────────────────
+let fireT = 0;
+function updateFire(dt) {
+  fireT += dt;
+  fireLight.intensity = 2.2 + Math.sin(fireT * 7.3) * 0.4 + Math.sin(fireT * 13.1) * 0.2;
+}
+
+// ─── Loop principal ───────────────────────────────────────────
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  if (mixer) mixer.update(dt);
+  updateFire(dt);
+  renderer.render(scene, camera);
+}
+
+// ─── Init ─────────────────────────────────────────────────────
+(async () => {
+  try {
+    await loadCabin();
+    const { avatarScene } = await loadAvatar();
+    await loadAnimations(avatarScene);
+    setProgress(100, '¡Listo!');
+    await new Promise(r => setTimeout(r, 500));
+    hideLoading();
+    animate();
+    // Mensaje de bienvenida
+    setTimeout(() => {
+      const greeting = chatHistory.find(m => m.role === 'system') ? null : null;
+      // pequeño ping visual
+      addMessage('…bienvenido a la cabaña.', 'avatar');
+    }, 800);
+  } catch (err) {
+    $loadStatus.textContent = 'Error: ' + err.message;
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>
