@@ -1,165 +1,124 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Cabaña AI</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+  <title>Cabaña</title>
 
   <script type="importmap">
-  {
-    "imports": {
-      "three":         "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
-    }
-  }
+  {"imports":{
+    "three":         "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }}
   </script>
 
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #000; overflow: hidden; font-family: 'Segoe UI', sans-serif; touch-action: none; }
-    canvas { position: fixed; top: 0; left: 0; z-index: 0; }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;touch-action:none}
+    canvas{position:fixed;top:0;left:0;z-index:0}
 
-    /* ─── Loading ────────────────────────────────────────── */
-    #loading {
-      position: fixed; inset: 0; background: #0d0a07;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      z-index: 100; gap: 18px;
+    /* ── Loading ──────────────────────────────── */
+    #loading{
+      position:fixed;inset:0;background:#0c0905;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:16px;z-index:100
     }
-    #loading h1 { color: #e8c87a; font-size: 2rem; letter-spacing: .1em; }
-    #loading p  { color: #a08060; font-size: .9rem; }
-    #bar-wrap   { width: 260px; height: 6px; background: #2a2010; border-radius: 3px; overflow: hidden; }
-    #bar        { height: 100%; width: 0%; background: #e8c87a; transition: width .3s; }
+    #loading h1{color:#d4a84b;font-size:1.8rem;letter-spacing:.15em;font-weight:300}
+    #load-label{color:#7a5e38;font-size:.82rem}
+    #bar-wrap{width:220px;height:4px;background:#1e150a;border-radius:2px;overflow:hidden}
+    #bar{height:100%;width:0%;background:#d4a84b;transition:width .3s}
 
-    /* ─── Joystick virtual ────────────────────────────────── */
-    #joystick-wrap {
-      position: fixed; z-index: 15; pointer-events: none;
-      display: none;
+    /* ── Joystick ─────────────────────────────── */
+    #joy-wrap{
+      position:fixed;bottom:44px;left:44px;
+      width:112px;height:112px;z-index:15;
+      pointer-events:none;display:none
     }
-    #joystick-base {
-      width: 110px; height: 110px;
-      border: 2px solid rgba(255,255,255,.25);
-      border-radius: 50%;
-      background: rgba(0,0,0,.25);
-      position: relative;
+    #joy-ring{
+      width:100%;height:100%;
+      border:1.5px solid rgba(255,255,255,.22);
+      border-radius:50%;background:rgba(0,0,0,.3);
+      position:relative
     }
-    #joystick-handle {
-      width: 46px; height: 46px;
-      background: rgba(232,200,122,.6);
-      border-radius: 50%;
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      transition: transform .04s;
+    #joy-dot{
+      width:42px;height:42px;
+      background:rgba(212,168,75,.65);
+      border-radius:50%;
+      position:absolute;top:50%;left:50%;
+      transform:translate(-50%,-50%)
     }
 
-    /* ─── Botón hablar ────────────────────────────────────── */
-    #talk-btn {
-      position: fixed; bottom: 32px; right: 28px;
-      background: rgba(232,200,122,.92);
-      border: none; border-radius: 50px;
-      padding: 15px 26px; font-size: 1rem; font-weight: 700;
-      color: #1a0f00; cursor: pointer; z-index: 20;
-      box-shadow: 0 4px 20px rgba(0,0,0,.5);
-      display: none;
-      -webkit-tap-highlight-color: transparent;
+    /* ── Botón hablar ─────────────────────────── */
+    #talk-btn{
+      position:fixed;bottom:44px;right:28px;
+      background:#d4a84b;border:none;border-radius:40px;
+      padding:14px 22px;font-size:.95rem;font-weight:700;
+      color:#0c0905;cursor:pointer;z-index:20;
+      box-shadow:0 4px 18px rgba(0,0,0,.55);
+      display:none;-webkit-tap-highlight-color:transparent
     }
 
-    /* ─── Chat — bottom sheet ─────────────────────────────── */
-    #chat-panel {
-      position: fixed; bottom: 0; left: 0; right: 0;
-      background: rgba(10,7,3,.94);
-      border-top: 1px solid rgba(232,200,122,.25);
-      border-radius: 18px 18px 0 0;
-      backdrop-filter: blur(14px);
-      display: none; flex-direction: column;
-      max-height: 55vh; z-index: 30;
-      box-shadow: 0 -6px 30px rgba(0,0,0,.6);
+    /* ── Chat ─────────────────────────────────── */
+    #chat{
+      position:fixed;bottom:0;left:0;right:0;
+      background:rgba(12,9,5,.96);
+      border-top:1px solid rgba(212,168,75,.2);
+      border-radius:16px 16px 0 0;
+      display:none;flex-direction:column;
+      max-height:52vh;z-index:30;
+      box-shadow:0 -4px 28px rgba(0,0,0,.7)
     }
-    #chat-header {
-      padding: 12px 18px 10px;
-      border-bottom: 1px solid rgba(232,200,122,.12);
-      color: #e8c87a; font-size: .88rem; font-weight: 600;
-      display: flex; justify-content: space-between; align-items: center;
+    #chat-head{
+      padding:11px 16px;
+      border-bottom:1px solid rgba(212,168,75,.12);
+      color:#d4a84b;font-size:.82rem;font-weight:600;
+      display:flex;justify-content:space-between;align-items:center
     }
-    #chat-close {
-      background: none; border: none; color: #a08060;
-      font-size: 1.2rem; cursor: pointer; padding: 0 4px;
+    #chat-x{background:none;border:none;color:#7a5e38;font-size:1.1rem;cursor:pointer;padding:0 2px}
+    #msgs{
+      flex:1;overflow-y:auto;padding:11px 13px;
+      display:flex;flex-direction:column;gap:7px;
+      scrollbar-width:thin;scrollbar-color:#2a1e0e transparent
     }
-    #messages {
-      flex: 1; overflow-y: auto; padding: 12px;
-      display: flex; flex-direction: column; gap: 8px;
-      scrollbar-width: thin; scrollbar-color: #3a2a10 transparent;
+    .m{max-width:85%;padding:8px 12px;border-radius:12px;font-size:.83rem;line-height:1.45;word-break:break-word}
+    .m.u{align-self:flex-end;background:rgba(212,168,75,.16);color:#eed898;border-bottom-right-radius:3px}
+    .m.a{align-self:flex-start;background:rgba(60,35,12,.7);color:#c49a5a;border-bottom-left-radius:3px}
+    .m.t{font-style:italic;opacity:.55}
+    #inp-row{display:flex;gap:7px;padding:9px 12px 14px;border-top:1px solid rgba(212,168,75,.1)}
+    #txt{
+      flex:1;background:rgba(255,255,255,.05);
+      border:1px solid rgba(212,168,75,.18);border-radius:9px;
+      padding:9px 12px;color:#eed898;font-size:.88rem;
+      outline:none;resize:none;min-height:38px;max-height:76px;font-family:inherit
     }
-    .msg {
-      max-width: 86%; padding: 9px 13px;
-      border-radius: 14px; font-size: .84rem; line-height: 1.45;
-      word-break: break-word;
+    #txt::placeholder{color:rgba(212,168,75,.3)}
+    #snd{
+      background:rgba(212,168,75,.2);border:1px solid rgba(212,168,75,.28);
+      border-radius:9px;padding:0 15px;color:#d4a84b;font-size:1rem;cursor:pointer;min-width:46px
     }
-    .msg.user   { align-self: flex-end;  background: rgba(232,200,122,.18); color: #f0dca0; border-bottom-right-radius: 4px; }
-    .msg.avatar { align-self: flex-start; background: rgba(80,50,20,.55); color: #d4b888; border-bottom-left-radius: 4px; }
-    .msg.typing { font-style: italic; opacity: .6; }
-
-    #input-row {
-      display: flex; gap: 8px; padding: 10px 14px 16px;
-      border-top: 1px solid rgba(232,200,122,.1);
-    }
-    #user-input {
-      flex: 1; background: rgba(255,255,255,.06);
-      border: 1px solid rgba(232,200,122,.2); border-radius: 10px;
-      padding: 10px 14px; color: #f0dca0; font-size: .9rem;
-      outline: none; resize: none; min-height: 40px; max-height: 80px;
-      font-family: inherit;
-    }
-    #user-input::placeholder { color: rgba(232,200,122,.35); }
-    #send-btn {
-      background: rgba(232,200,122,.22);
-      border: 1px solid rgba(232,200,122,.3); border-radius: 10px;
-      padding: 0 16px; color: #e8c87a; font-size: 1.1rem;
-      cursor: pointer; min-width: 48px;
-    }
-    #send-btn:disabled { opacity: .4; }
-
-    /* ─── Tooltip acercarse ───────────────────────────────── */
-    #approach-hint {
-      position: fixed; top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0,0,0,.65); color: #e8c87a;
-      padding: 8px 18px; border-radius: 8px;
-      font-size: .85rem; pointer-events: none;
-      display: none; z-index: 15;
-    }
+    #snd:disabled{opacity:.38}
   </style>
 </head>
 <body>
 
 <div id="loading">
-  <h1>Cabaña AI</h1>
-  <p id="load-status">Iniciando…</p>
+  <h1>CABAÑA</h1>
+  <p id="load-label">Cargando…</p>
   <div id="bar-wrap"><div id="bar"></div></div>
 </div>
 
-<!-- Joystick visual -->
-<div id="joystick-wrap">
-  <div id="joystick-base">
-    <div id="joystick-handle"></div>
-  </div>
-</div>
-
-<!-- HUD -->
+<div id="joy-wrap"><div id="joy-ring"><div id="joy-dot"></div></div></div>
 <button id="talk-btn">💬 Hablar</button>
-<div id="approach-hint">Acércate al personaje</div>
 
-<!-- Chat -->
-<div id="chat-panel">
-  <div id="chat-header">
-    <span>💬 Habla con Vinayagar</span>
-    <button id="chat-close">✕</button>
+<div id="chat">
+  <div id="chat-head">
+    <span>Vinayagar</span>
+    <button id="chat-x">✕</button>
   </div>
-  <div id="messages"></div>
-  <div id="input-row">
-    <textarea id="user-input" rows="1" placeholder="Escribe algo…"></textarea>
-    <button id="send-btn">➤</button>
+  <div id="msgs"></div>
+  <div id="inp-row">
+    <textarea id="txt" rows="1" placeholder="Escribe…"></textarea>
+    <button id="snd">➤</button>
   </div>
 </div>
 
@@ -169,93 +128,36 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { FBXLoader }   from 'three/addons/loaders/FBXLoader.js';
 
-/* ══════════════════════════════════════════════════════════════
-   CONFIGURA AQUÍ
-   ══════════════════════════════════════════════════════════════ */
-const AVATAR_URL    = 'RECURSOS/Vinayagar.fbx';
+/* ═══════════════════════════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════════════════════════ */
 const WORKER_URL    = 'https://empty-silence-364e.joniturbu.workers.dev/';
-const SYSTEM_PROMPT = `Eres un espíritu antiguo llamado Vinayagar que habita esta cabaña del bosque.
-Eres sabio, enigmático y amable. Respondes en español, con frases breves y evocadoras.
-Máximo 2-3 oraciones.`;
+const SYSTEM_PROMPT = `Eres Vinayagar, un espíritu sabio que habita esta cabaña.
+Responde en español, con frases breves y evocadoras. Máximo 2-3 oraciones.`;
+const EYE_H   = 1.55;   // altura de ojos (m)
+const WALL_M  = 0.32;   // margen de colisión con paredes
+const SPD     = 2.6;    // velocidad de cámara (m/s)
+const JR      = 48;     // radio joystick (px)
 
-const EYE_HEIGHT  = 1.5;   // altura de ojos sobre el suelo
-const WALL_MARGIN = 0.35;  // distancia mínima a paredes
-
-// Puntos de patrulla del personaje dentro de la cabaña
-const WAYPOINTS = [
-  new THREE.Vector3(-1.5, 0,  -1),
-  new THREE.Vector3( 1.5, 0,  -1),
-  new THREE.Vector3( 1.5, 0,   1.5),
-  new THREE.Vector3(-1.5, 0,   1.5),
-  new THREE.Vector3( 0,   0,  -2),
-  new THREE.Vector3( 0,   0,   2),
-];
-/* ══════════════════════════════════════════════════════════════ */
-
-// ─── UI refs ──────────────────────────────────────────────────
-const $bar         = document.getElementById('bar');
-const $loadStatus  = document.getElementById('load-status');
-const $loading     = document.getElementById('loading');
-const $messages    = document.getElementById('messages');
-const $input       = document.getElementById('user-input');
-const $sendBtn     = document.getElementById('send-btn');
-const $chatPanel   = document.getElementById('chat-panel');
-const $chatClose   = document.getElementById('chat-close');
-const $talkBtn     = document.getElementById('talk-btn');
-const $approachHint = document.getElementById('approach-hint');
-const $joystickWrap   = document.getElementById('joystick-wrap');
-const $joystickHandle = document.getElementById('joystick-handle');
-
-function setProgress(pct, label) {
-  $bar.style.width = pct + '%';
-  if (label) $loadStatus.textContent = label;
-}
-function hideLoading() {
-  $loading.style.transition = 'opacity .6s';
-  $loading.style.opacity = '0';
-  setTimeout(() => $loading.style.display = 'none', 700);
-}
-function addMessage(text, role) {
-  const div = document.createElement('div');
-  div.className = 'msg ' + role;
-  div.textContent = text;
-  $messages.appendChild(div);
-  $messages.scrollTop = $messages.scrollHeight;
-  return div;
-}
-
-// ─── Three.js ─────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════
+   THREE.JS
+═══════════════════════════════════════════════════════════ */
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace   = THREE.SRGBColorSpace;
 renderer.toneMapping        = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.toneMappingExposure = 1.05;
 document.body.insertBefore(renderer.domElement, document.body.firstChild);
 
-const scene  = new THREE.Scene();
-scene.background = new THREE.Color(0x0d0a07);
-scene.fog = new THREE.FogExp2(0x0d0a07, 0.03);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0c0905);
+scene.fog = new THREE.Fog(0x0c0905, 6, 18);
 
-// Cámara — tercera persona flotante
-const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 60);
-camera.position.set(0, 1.5, 4);
-let camYaw   = Math.PI;   // mirando hacia el personaje
-let camPitch = -0.1;
+const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.05, 30);
 camera.rotation.order = 'YXZ';
-
-// Luces
-scene.add(new THREE.AmbientLight(0xfff0d0, 0.55));
-const fireLight = new THREE.PointLight(0xff8c30, 2.5, 7);
-fireLight.position.set(-1.5, 1.2, -0.5);
-fireLight.castShadow = true;
-scene.add(fireLight);
-const dirLight = new THREE.DirectionalLight(0xfff5e0, 0.7);
-dirLight.position.set(2, 4, 2);
-dirLight.castShadow = true;
-scene.add(dirLight);
 
 window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
@@ -263,429 +165,448 @@ window.addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-// ─── Loaders ──────────────────────────────────────────────────
+// Luces
+scene.add(new THREE.AmbientLight(0xfff0d0, 0.5));
+const fireLight = new THREE.PointLight(0xff8830, 3.0, 8);
+fireLight.castShadow = true;
+scene.add(fireLight);
+const fill = new THREE.DirectionalLight(0xffeedd, 0.4);
+fill.position.set(1, 3, 1);
+scene.add(fill);
+
+/* ═══════════════════════════════════════════════════════════
+   COLISIÓN / GRAVEDAD
+═══════════════════════════════════════════════════════════ */
+let   colMeshes = [];
+const rc        = new THREE.Raycaster();
+const _dn       = new THREE.Vector3(0, -1, 0);
+const _ro       = new THREE.Vector3();
+const _wd       = new THREE.Vector3();
+let   groundY   = 0;
+
+function stickToFloor() {
+  if (!colMeshes.length) { camera.position.y = groundY + EYE_H; return; }
+  _ro.set(camera.position.x, camera.position.y + 0.8, camera.position.z);
+  rc.set(_ro, _dn); rc.far = 5;
+  const h = rc.intersectObjects(colMeshes, false);
+  if (h.length) { groundY = h[0].point.y; }
+  camera.position.y = groundY + EYE_H;
+}
+
+function blocked(dir, margin) {
+  if (!colMeshes.length) return false;
+  _wd.copy(dir).normalize();
+  rc.set(camera.position, _wd); rc.far = margin;
+  return rc.intersectObjects(colMeshes, false).length > 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LOADERS
+═══════════════════════════════════════════════════════════ */
 const draco = new DRACOLoader();
 draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/libs/draco/');
-const gltfLoader = new GLTFLoader();
-gltfLoader.setDRACOLoader(draco);
+const gltfL = new GLTFLoader(); gltfL.setDRACOLoader(draco);
+const fbxL  = new FBXLoader();
 
-// ─── Colisión con geometría real de la cabaña ─────────────────
-const cabinMeshes = [];
-const raycaster   = new THREE.Raycaster();
-const _gravDir    = new THREE.Vector3(0, -1, 0);
-const _gravOrigin = new THREE.Vector3();
-const _wallDir    = new THREE.Vector3();
-let   floorY      = 0;   // se actualiza cuando se detecta el suelo
-
-function applyFloor() {
-  if (!cabinMeshes.length) { camera.position.y = EYE_HEIGHT + floorY; return; }
-  _gravOrigin.set(camera.position.x, camera.position.y + 1.0, camera.position.z);
-  raycaster.set(_gravOrigin, _gravDir);
-  raycaster.far = 6;
-  const hits = raycaster.intersectObjects(cabinMeshes, false);
-  if (hits.length) {
-    floorY = hits[0].point.y;
-    camera.position.y = floorY + EYE_HEIGHT;
-  } else {
-    camera.position.y = floorY + EYE_HEIGHT; // mantiene último suelo conocido
-  }
+function setP(v, t) {
+  document.getElementById('bar').style.width = v + '%';
+  document.getElementById('load-label').textContent = t;
 }
 
-function wallBlocked(dir, margin) {
-  if (!cabinMeshes.length) return false;
-  _wallDir.copy(dir).normalize();
-  raycaster.set(camera.position, _wallDir);
-  raycaster.far = margin;
-  return raycaster.intersectObjects(cabinMeshes, false).length > 0;
+/* ═══════════════════════════════════════════════════════════
+   CARGA CABAÑA — auto-escala + cámara dentro
+═══════════════════════════════════════════════════════════ */
+let cabinBounds = new THREE.Box3();
+
+async function loadCabin() {
+  setP(5, 'Cabaña…');
+  return new Promise((res, rej) => {
+    gltfL.load('RECURSOS/caba%C3%B1apruebainterior.glb', (gltf) => {
+      const cabin = gltf.scene;
+
+      // — Auto-escala: queremos que la habitación mida ~8–10 m en su eje mayor
+      const raw = new THREE.Box3().setFromObject(cabin);
+      const sz  = raw.getSize(new THREE.Vector3());
+      const maxD = Math.max(sz.x, sz.z);
+      if (maxD > 0.01) {
+        const target = 9;
+        const s = target / maxD;
+        // Solo escalar si está muy desproporcionado (< 0.5× o > 3× del target)
+        if (s < 0.5 || s > 3) cabin.scale.setScalar(s);
+      }
+
+      // — Bajar suelo a y = 0
+      const box2 = new THREE.Box3().setFromObject(cabin);
+      cabin.position.y -= box2.min.y;
+
+      cabin.traverse(n => {
+        if (n.isMesh) {
+          n.castShadow = true; n.receiveShadow = true;
+          colMeshes.push(n);
+        }
+      });
+      scene.add(cabin);
+
+      // Calcular bounds finales para waypoints y posición inicial de cámara
+      cabinBounds.setFromObject(cabin);
+      const c = cabinBounds.getCenter(new THREE.Vector3());
+      const s2 = cabinBounds.getSize(new THREE.Vector3());
+
+      // Colocar luz de fuego en esquina interior
+      fireLight.position.set(c.x - s2.x * 0.3, 1.2, c.z - s2.z * 0.3);
+
+      // Posición inicial de cámara: dentro de la cabaña, mirando al centro
+      camera.position.set(c.x, EYE_H, c.z + s2.z * 0.3);
+      camYaw = Math.PI; camPitch = -0.05;
+      groundY = 0;
+
+      setP(42, 'Cabaña lista');
+      res({ center: c, size: s2 });
+    },
+    xhr => { if (xhr.total) setP(5 + (xhr.loaded/xhr.total)*35, 'Cabaña…'); },
+    rej);
+  });
 }
 
-// ─── Estado del personaje ─────────────────────────────────────
-let characterWrapper = null;   // Group que se mueve por la cabaña
-let avatarHead       = null;   // para animación procedural del placeholder
-let mixer            = null;
-let idleAction       = null;
-let talkAction       = null;
-let talkTimer        = null;
-let avatarState      = 'idle'; // 'idle' | 'talking'
-let elapsedTime      = 0;
+/* ═══════════════════════════════════════════════════════════
+   AVATAR — FBX + placeholder
+═══════════════════════════════════════════════════════════ */
+let charWrap   = null;
+let mixer      = null;
+let idleClip   = null;
+let talkClip   = null;
+let avatarHead = null;
+let avatarT    = 0;
+let avatarState = 'idle'; // 'idle'|'walk'|'talking'
 
-// Máquina de estados del personaje autónomo
-const CHAR = {
-  state:       'walk',       // 'walk' | 'wait'
-  wpIndex:     0,
-  waitTimer:   0,
-  speed:       0.9,          // unidades/segundo
-  rotY:        0,            // rotación actual (suavizada)
-};
-const _toTarget = new THREE.Vector3();
+// Waypoints se generan después de saber el tamaño de la cabaña
+let waypoints = [];
+let wpIdx = 0;
+const CHAR = { waitT: 0, rotY: 0, speed: 0.7 };
+const _toWP = new THREE.Vector3();
 
-function updateCharacterAI(dt) {
-  if (!characterWrapper) return;
+function buildWaypoints(c, s) {
+  const mx = s.x * 0.32, mz = s.z * 0.32;
+  waypoints = [
+    new THREE.Vector3(c.x - mx, 0, c.z - mz),
+    new THREE.Vector3(c.x + mx, 0, c.z - mz),
+    new THREE.Vector3(c.x + mx, 0, c.z + mz),
+    new THREE.Vector3(c.x - mx, 0, c.z + mz),
+    new THREE.Vector3(c.x,      0, c.z),
+    new THREE.Vector3(c.x - mx * 0.5, 0, c.z + mz * 0.6),
+  ];
+}
+
+function createPlaceholder(center) {
+  const g = new THREE.Group();
+  g.position.set(center.x, 0, center.z);
+  const mB = new THREE.MeshStandardMaterial({ color: 0x7755aa, emissive: 0x220033, roughness: 0.6 });
+  const mH = new THREE.MeshStandardMaterial({ color: 0xcc9966, emissive: 0x221100, roughness: 0.5 });
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.52, 10), mB);
+  torso.position.y = 1.28; torso.castShadow = true; g.add(torso);
+  avatarHead = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 8), mH);
+  avatarHead.position.y = 1.72; avatarHead.castShadow = true; g.add(avatarHead);
+  scene.add(g); charWrap = g;
+}
+
+async function loadAvatar(center) {
+  setP(44, 'Personaje…');
+  return new Promise(res => {
+    fbxL.load('RECURSOS/Vinayagar.fbx', obj => {
+      const w = new THREE.Group();
+      w.position.set(center.x, 0, center.z);
+      obj.scale.setScalar(0.01);
+      obj.traverse(n => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
+      w.add(obj);
+      scene.add(w);
+      mixer   = new THREE.AnimationMixer(obj);
+      charWrap = w;
+      // Buscar clips idle / talk dentro del FBX
+      const findC = kws => obj.animations.find(c => kws.some(k => c.name.toLowerCase().includes(k)));
+      idleClip = findC(['idle', 'stand']);
+      talkClip = findC(['talk', 'speak']);
+      if (idleClip) { const a = mixer.clipAction(idleClip); a.setLoop(THREE.LoopRepeat); a.play(); }
+      setP(75, 'Personaje listo');
+      res();
+    },
+    xhr => { if (xhr.total) setP(44 + (xhr.loaded/xhr.total)*28, 'Personaje…'); },
+    err => {
+      console.warn('FBX fallback placeholder:', err.message);
+      createPlaceholder(center);
+      setP(75, 'Personaje (placeholder)');
+      res();
+    });
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   IA AUTÓNOMA DEL PERSONAJE
+═══════════════════════════════════════════════════════════ */
+function updateCharAI(dt) {
+  if (!charWrap || !waypoints.length) return;
+
+  // Mientras habla: girar hacia la cámara
   if (avatarState === 'talking') {
-    // Gira suavemente para mirar a la cámara
-    _toTarget.subVectors(camera.position, characterWrapper.position);
-    const targetAngle = Math.atan2(_toTarget.x, _toTarget.z);
-    CHAR.rotY += (targetAngle - CHAR.rotY) * Math.min(dt * 4, 1);
-    characterWrapper.rotation.y = CHAR.rotY;
+    _toWP.subVectors(camera.position, charWrap.position);
+    const tA = Math.atan2(_toWP.x, _toWP.z);
+    CHAR.rotY += (tA - CHAR.rotY) * Math.min(dt * 4, 1);
+    charWrap.rotation.y = CHAR.rotY;
     return;
   }
 
-  if (CHAR.state === 'wait') {
-    CHAR.waitTimer -= dt;
-    if (CHAR.waitTimer <= 0) CHAR.state = 'walk';
-    return;
-  }
+  // Esperar
+  if (CHAR.waitT > 0) { CHAR.waitT -= dt; avatarState = 'idle'; return; }
 
-  // Mover hacia waypoint actual
-  const wp  = WAYPOINTS[CHAR.wpIndex];
-  const pos = characterWrapper.position;
-  _toTarget.set(wp.x - pos.x, 0, wp.z - pos.z);
-  const dist = _toTarget.length();
-
-  if (dist < 0.15) {
-    // Llegó — esperar y cambiar waypoint
-    CHAR.state     = 'wait';
-    CHAR.waitTimer = 1.5 + Math.random() * 2.5;
-    CHAR.wpIndex   = (CHAR.wpIndex + 1) % WAYPOINTS.length;
+  // Mover hacia waypoint
+  avatarState = 'walk';
+  const wp  = waypoints[wpIdx];
+  _toWP.set(wp.x - charWrap.position.x, 0, wp.z - charWrap.position.z);
+  const d = _toWP.length();
+  if (d < 0.12) {
+    wpIdx = (wpIdx + 1) % waypoints.length;
+    CHAR.waitT = 1.2 + Math.random() * 2.8;
   } else {
-    _toTarget.normalize();
-    pos.x += _toTarget.x * CHAR.speed * dt;
-    pos.z += _toTarget.z * CHAR.speed * dt;
-    // Girar hacia la dirección de movimiento
-    const targetAngle = Math.atan2(_toTarget.x, _toTarget.z);
-    CHAR.rotY += (targetAngle - CHAR.rotY) * Math.min(dt * 6, 1);
-    characterWrapper.rotation.y = CHAR.rotY;
+    _toWP.normalize();
+    charWrap.position.x += _toWP.x * CHAR.speed * dt;
+    charWrap.position.z += _toWP.z * CHAR.speed * dt;
+    const tA = Math.atan2(_toWP.x, _toWP.z);
+    CHAR.rotY += (tA - CHAR.rotY) * Math.min(dt * 6, 1);
+    charWrap.rotation.y = CHAR.rotY;
   }
 }
 
-// ─── Animaciones del personaje ────────────────────────────────
-function startTalking(textLength) {
+// Animación procedural del placeholder
+let phT = 0;
+function updatePlaceholder(dt) {
+  if (!avatarHead) return;
+  phT += dt;
+  if (avatarState !== 'talking') {
+    avatarHead.position.y = 1.72 + Math.sin(phT * 1.1) * 0.007;
+    avatarHead.rotation.z = 0;
+  } else {
+    avatarHead.position.y = 1.72 + Math.sin(phT * 9) * 0.018;
+    avatarHead.rotation.z = Math.sin(phT * 11) * 0.04;
+  }
+}
+
+// Transición de animación cuando habla / para
+let talkTimer = null;
+function startTalking(len) {
   avatarState = 'talking';
   clearTimeout(talkTimer);
-  const duration = Math.max(2, Math.min(textLength * 0.065, 8));
-  if (mixer && idleAction && talkAction) {
-    idleAction.crossFadeTo(talkAction, 0.3, false);
-    talkAction.reset().play();
+  if (mixer && idleClip && talkClip) {
+    const iA = mixer.clipAction(idleClip);
+    const tA = mixer.clipAction(talkClip);
+    iA.crossFadeTo(tA, 0.3, false); tA.reset().play();
   }
-  talkTimer = setTimeout(stopTalking, duration * 1000);
+  talkTimer = setTimeout(stopTalking, Math.max(2000, Math.min(len * 65, 8000)));
 }
 function stopTalking() {
   avatarState = 'idle';
-  if (mixer && idleAction && talkAction) {
-    talkAction.crossFadeTo(idleAction, 0.5, false);
-    idleAction.reset().play();
+  if (mixer && idleClip && talkClip) {
+    const iA = mixer.clipAction(idleClip);
+    const tA = mixer.clipAction(talkClip);
+    tA.crossFadeTo(iA, 0.5, false); iA.reset().play();
   }
 }
-function updateProceduralAvatar(dt) {
-  if (!avatarHead) return;
-  elapsedTime += dt;
-  if (avatarState !== 'talking') {
-    avatarHead.position.y = 1.72 + Math.sin(elapsedTime * 1.1) * 0.007;
-    avatarHead.rotation.z = 0;
-  } else {
-    avatarHead.position.y = 1.72 + Math.sin(elapsedTime * 9) * 0.018;
-    avatarHead.rotation.z = Math.sin(elapsedTime * 11) * 0.04;
-  }
-}
-function setupAvatarAnimations(obj, clips) {
-  if (!obj || !mixer || !clips.length) return;
-  const findClip = (kws) => clips.find(c => kws.some(k => c.name.toLowerCase().includes(k)));
-  const idleClip = findClip(['idle', 'stand']);
-  const talkClip = findClip(['talk', 'speak']);
-  if (idleClip) { idleAction = mixer.clipAction(idleClip); idleAction.setLoop(THREE.LoopRepeat).play(); }
-  if (talkClip) { talkAction = mixer.clipAction(talkClip); talkAction.setLoop(THREE.LoopRepeat); }
-}
 
-// ─── Carga cabaña ─────────────────────────────────────────────
-async function loadCabin() {
-  setProgress(5, 'Cargando cabaña…');
-  return new Promise((resolve, reject) => {
-    gltfLoader.load('RECURSOS/caba%C3%B1apruebainterior.glb',
-      (gltf) => {
-        const cabin = gltf.scene;
-        cabin.traverse(n => {
-          if (n.isMesh) {
-            n.castShadow = true; n.receiveShadow = true;
-            cabinMeshes.push(n);
-          }
-        });
-        scene.add(cabin);
-        setProgress(40, 'Cabaña lista');
-        resolve();
-      },
-      (xhr) => { if (xhr.total) setProgress(5 + (xhr.loaded / xhr.total) * 35, `Cabaña…`); },
-      reject
-    );
-  });
-}
+/* ═══════════════════════════════════════════════════════════
+   GROQ / CHAT
+═══════════════════════════════════════════════════════════ */
+const history = [{ role: 'system', content: SYSTEM_PROMPT }];
 
-// ─── Carga avatar ─────────────────────────────────────────────
-function createPlaceholderAvatar() {
-  const g = new THREE.Group();
-  g.position.set(0, 0, 0);
-  const mat  = new THREE.MeshStandardMaterial({ color: 0x7755aa, emissive: 0x220033, roughness: 0.6 });
-  const hmat = new THREE.MeshStandardMaterial({ color: 0xcc9966, emissive: 0x221100, roughness: 0.5 });
-  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.52, 10), mat);
-  torso.position.y = 1.28; torso.castShadow = true; g.add(torso);
-  avatarHead = new THREE.Mesh(new THREE.SphereGeometry(0.14, 14, 10), hmat);
-  avatarHead.position.y = 1.72; avatarHead.castShadow = true; g.add(avatarHead);
-  scene.add(g);
-  characterWrapper = g;
-}
-async function loadAvatar() {
-  setProgress(42, 'Cargando personaje…');
-  const fbxLoader = new FBXLoader();
-  return new Promise((resolve) => {
-    fbxLoader.load(AVATAR_URL,
-      (object) => {
-        const wrapper = new THREE.Group();
-        wrapper.position.set(0, 0, 0);
-        object.scale.setScalar(0.01);
-        object.traverse(n => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
-        wrapper.add(object);
-        scene.add(wrapper);
-        mixer = new THREE.AnimationMixer(object);
-        characterWrapper = wrapper;
-        setProgress(70, 'Personaje listo');
-        resolve({ avatarScene: object, clips: object.animations });
-      },
-      (xhr) => { if (xhr.total) setProgress(42 + (xhr.loaded / xhr.total) * 25, 'Personaje…'); },
-      (err) => {
-        console.warn('FBX no cargado, usando placeholder:', err.message);
-        createPlaceholderAvatar();
-        setProgress(70, 'Personaje (placeholder)');
-        resolve({ avatarScene: null, clips: [] });
-      }
-    );
-  });
-}
-
-// ─── Groq API ─────────────────────────────────────────────────
-const chatHistory = [{ role: 'system', content: SYSTEM_PROMPT }];
-async function askGroq(userText) {
-  chatHistory.push({ role: 'user', content: userText });
-  const typingDiv = addMessage('…', 'avatar typing');
+async function askGroq(text) {
+  history.push({ role: 'user', content: text });
+  const div = addMsg('…', 'a t');
   try {
-    const res = await fetch(WORKER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: chatHistory, max_tokens: 200, temperature: 0.8 })
+    const r = await fetch(WORKER_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: history, max_tokens: 200, temperature: 0.85 })
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data  = await res.json();
-    const reply = data.choices[0].message.content.trim();
-    chatHistory.push({ role: 'assistant', content: reply });
-    typingDiv.classList.remove('typing');
-    typingDiv.textContent = reply;
-    $messages.scrollTop = $messages.scrollHeight;
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    const reply = d.choices[0].message.content.trim();
+    history.push({ role: 'assistant', content: reply });
+    div.className = 'm a'; div.textContent = reply;
+    document.getElementById('msgs').scrollTop = 9999;
     startTalking(reply.length);
-  } catch (err) {
-    typingDiv.textContent = `[Error: ${err.message}]`;
-    typingDiv.classList.remove('typing');
-    console.error(err);
+  } catch (e) {
+    div.className = 'm a'; div.textContent = '[Error: ' + e.message + ']';
   }
 }
 
-// ─── Chat UI ──────────────────────────────────────────────────
+function addMsg(txt, cls) {
+  const d = document.createElement('div');
+  d.className = 'm ' + cls; d.textContent = txt;
+  const msgs = document.getElementById('msgs');
+  msgs.appendChild(d); msgs.scrollTop = 9999;
+  return d;
+}
+
+/* ── Chat UI ──────────────────────────────────────────────── */
 let chatOpen = false;
-function openChat()  {
-  chatOpen = true;
-  $chatPanel.style.display = 'flex';
-  $talkBtn.style.display   = 'none';
-  setTimeout(() => $input.focus(), 80);
-}
-function closeChat() {
-  chatOpen = false;
-  $chatPanel.style.display = 'none';
-  if (nearCharacter()) $talkBtn.style.display = 'block';
-}
-async function handleSend() {
-  const text = $input.value.trim();
-  if (!text) return;
-  $input.value = '';
-  $sendBtn.disabled = true;
-  addMessage(text, 'user');
-  await askGroq(text);
-  $sendBtn.disabled = false;
-  $input.focus();
-}
-$sendBtn.addEventListener('click', handleSend);
-$chatClose.addEventListener('click', closeChat);
+const $chat    = document.getElementById('chat');
+const $talkBtn = document.getElementById('talk-btn');
+const $snd     = document.getElementById('snd');
+const $txt     = document.getElementById('txt');
+
+function openChat()  { chatOpen = true;  $chat.style.display = 'flex'; $talkBtn.style.display = 'none'; setTimeout(() => $txt.focus(), 60); }
+function closeChat() { chatOpen = false; $chat.style.display = 'none'; }
+
+document.getElementById('chat-x').addEventListener('click', closeChat);
 $talkBtn.addEventListener('click', openChat);
-$input.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
-});
+$snd.addEventListener('click', send);
+$txt.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
 
-// ─── Proximidad al personaje ───────────────────────────────────
-const INTERACT_DIST = 3.2;
-function nearCharacter() {
-  if (!characterWrapper) return false;
-  return camera.position.distanceTo(characterWrapper.position) <= INTERACT_DIST;
-}
-function checkProximity() {
-  if (chatOpen) return;
-  const cerca = nearCharacter();
-  $talkBtn.style.display      = cerca ? 'block' : 'none';
-  $approachHint.style.display = cerca ? 'none'  : 'none'; // opcional: mostrar cuando lejos
+async function send() {
+  const t = $txt.value.trim(); if (!t) return;
+  $txt.value = ''; $snd.disabled = true;
+  addMsg(t, 'u');
+  await askGroq(t);
+  $snd.disabled = false; $txt.focus();
 }
 
-// ─── Controles táctiles ───────────────────────────────────────
-// Joystick izquierdo: mover cámara
-// Arrastre derecho:   girar cámara
-
-const JOY_MAX = 48;
-const joy = { active: false, id: null, baseX: 0, baseY: 0, dx: 0, dy: 0 };
-const look = { active: false, id: null, lastX: 0, lastY: 0 };
-
-// También teclado (desktop)
+/* ═══════════════════════════════════════════════════════════
+   CONTROLES TÁCTILES + DESKTOP
+═══════════════════════════════════════════════════════════ */
+let camYaw = Math.PI, camPitch = -0.05;
+const joy  = { on: false, id: null, dx: 0, dy: 0, bx: 0, by: 0 };
+const lk   = { on: false, id: null, lx: 0, ly: 0 };
 const keys = {};
-document.addEventListener('keydown', e => { keys[e.code] = true; });
+
+const $jWrap = document.getElementById('joy-wrap');
+const $jDot  = document.getElementById('joy-dot');
+
+document.addEventListener('keydown', e => { keys[e.code] = true; if (e.code === 'Escape') closeChat(); });
 document.addEventListener('keyup',   e => { keys[e.code] = false; });
 
-renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
-renderer.domElement.addEventListener('touchmove',  onTouchMove,  { passive: false });
-renderer.domElement.addEventListener('touchend',   onTouchEnd,   { passive: false });
-renderer.domElement.addEventListener('touchcancel',onTouchEnd,   { passive: false });
+renderer.domElement.addEventListener('touchstart', ts, { passive: false });
+renderer.domElement.addEventListener('touchmove',  tm,  { passive: false });
+renderer.domElement.addEventListener('touchend',   te,  { passive: false });
+renderer.domElement.addEventListener('touchcancel',te,  { passive: false });
 
-function onTouchStart(e) {
+function ts(e) {
   e.preventDefault();
   for (const t of e.changedTouches) {
-    if (t.clientX < innerWidth * 0.45 && !joy.active) {
-      joy.active = true; joy.id = t.identifier;
-      joy.baseX = t.clientX; joy.baseY = t.clientY;
-      joy.dx = 0; joy.dy = 0;
-      $joystickWrap.style.left   = (t.clientX - 55) + 'px';
-      $joystickWrap.style.top    = (t.clientY - 55) + 'px';
-      $joystickWrap.style.display = 'block';
-      $joystickHandle.style.transform = 'translate(-50%,-50%)';
-    } else if (!look.active && !joy.active) {
-      look.active = true; look.id = t.identifier;
-      look.lastX = t.clientX; look.lastY = t.clientY;
-    } else if (!look.active) {
-      look.active = true; look.id = t.identifier;
-      look.lastX = t.clientX; look.lastY = t.clientY;
+    if (t.clientX < innerWidth * 0.48 && !joy.on) {
+      joy.on = true; joy.id = t.identifier;
+      joy.bx = t.clientX; joy.by = t.clientY; joy.dx = 0; joy.dy = 0;
+      $jWrap.style.left = (t.clientX - 56) + 'px';
+      $jWrap.style.top  = (t.clientY - 56) + 'px';
+      $jWrap.style.display = 'block';
+      $jDot.style.transform = 'translate(-50%,-50%)';
+    } else if (!lk.on) {
+      lk.on = true; lk.id = t.identifier; lk.lx = t.clientX; lk.ly = t.clientY;
     }
   }
 }
-function onTouchMove(e) {
+function tm(e) {
   e.preventDefault();
   for (const t of e.changedTouches) {
     if (t.identifier === joy.id) {
-      joy.dx = t.clientX - joy.baseX;
-      joy.dy = t.clientY - joy.baseY;
-      const len = Math.sqrt(joy.dx*joy.dx + joy.dy*joy.dy);
-      if (len > JOY_MAX) { joy.dx *= JOY_MAX/len; joy.dy *= JOY_MAX/len; }
-      $joystickHandle.style.transform = `translate(calc(-50% + ${joy.dx}px), calc(-50% + ${joy.dy}px))`;
+      joy.dx = t.clientX - joy.bx; joy.dy = t.clientY - joy.by;
+      const l = Math.hypot(joy.dx, joy.dy);
+      if (l > JR) { joy.dx *= JR/l; joy.dy *= JR/l; }
+      $jDot.style.transform = `translate(calc(-50% + ${joy.dx}px),calc(-50% + ${joy.dy}px))`;
     }
-    if (t.identifier === look.id) {
-      const dx = t.clientX - look.lastX;
-      const dy = t.clientY - look.lastY;
-      camYaw   -= dx * 0.004;
-      camPitch -= dy * 0.004;
-      camPitch  = Math.max(-Math.PI * 0.35, Math.min(Math.PI * 0.35, camPitch));
-      look.lastX = t.clientX; look.lastY = t.clientY;
+    if (t.identifier === lk.id) {
+      camYaw   -= (t.clientX - lk.lx) * 0.0038;
+      camPitch -= (t.clientY - lk.ly) * 0.0038;
+      camPitch  = Math.max(-1.1, Math.min(1.1, camPitch));
+      lk.lx = t.clientX; lk.ly = t.clientY;
     }
   }
 }
-function onTouchEnd(e) {
+function te(e) {
   for (const t of e.changedTouches) {
-    if (t.identifier === joy.id) {
-      joy.active = false; joy.id = null; joy.dx = 0; joy.dy = 0;
-      $joystickWrap.style.display = 'none';
-    }
-    if (t.identifier === look.id) { look.active = false; look.id = null; }
+    if (t.identifier === joy.id) { joy.on = false; joy.id = null; joy.dx = 0; joy.dy = 0; $jWrap.style.display = 'none'; }
+    if (t.identifier === lk.id)  { lk.on = false; lk.id = null; }
   }
 }
 
-// Mouse (desktop)
-let mouseDown = false, lastMX = 0, lastMY = 0;
-renderer.domElement.addEventListener('mousedown', e => { mouseDown = true; lastMX = e.clientX; lastMY = e.clientY; });
-window.addEventListener('mouseup',   () => { mouseDown = false; });
-window.addEventListener('mousemove', (e) => {
-  if (!mouseDown || chatOpen) return;
-  camYaw   -= (e.clientX - lastMX) * 0.003;
-  camPitch -= (e.clientY - lastMY) * 0.003;
-  camPitch  = Math.max(-Math.PI * 0.35, Math.min(Math.PI * 0.35, camPitch));
-  lastMX = e.clientX; lastMY = e.clientY;
+// Mouse desktop
+let mdown = false, mlx = 0, mly = 0;
+renderer.domElement.addEventListener('mousedown', e => { mdown = true; mlx = e.clientX; mly = e.clientY; });
+window.addEventListener('mouseup', () => mdown = false);
+window.addEventListener('mousemove', e => {
+  if (!mdown || chatOpen) return;
+  camYaw   -= (e.clientX - mlx) * 0.003; camPitch -= (e.clientY - mly) * 0.003;
+  camPitch  = Math.max(-1.1, Math.min(1.1, camPitch));
+  mlx = e.clientX; mly = e.clientY;
 });
 
-// ─── Movimiento de cámara con colisiones ─────────────────────
-const _fwd   = new THREE.Vector3();
-const _right = new THREE.Vector3();
-const _moveX = new THREE.Vector3();
-const _moveZ = new THREE.Vector3();
+/* ═══════════════════════════════════════════════════════════
+   MOVIMIENTO DE CÁMARA CON COLISIÓN
+═══════════════════════════════════════════════════════════ */
+const _f = new THREE.Vector3(), _r = new THREE.Vector3();
+const _mX = new THREE.Vector3(), _mZ = new THREE.Vector3();
 
-function updateCamera(dt) {
+function moveCamera(dt) {
   camera.rotation.set(camPitch, camYaw, 0, 'YXZ');
   if (chatOpen) return;
 
-  const speed = 2.8;
-  _fwd.set(-Math.sin(camYaw), 0, -Math.cos(camYaw));
-  _right.set( Math.cos(camYaw), 0, -Math.sin(camYaw));
+  _f.set(-Math.sin(camYaw), 0, -Math.cos(camYaw));
+  _r.set( Math.cos(camYaw), 0, -Math.sin(camYaw));
 
-  // Calcular delta de movimiento deseado
   let dx = 0, dz = 0;
+  if (joy.on) { dx = (joy.dx / JR) * SPD * dt; dz = -(joy.dy / JR) * SPD * dt; }
+  if (keys['KeyW'] || keys['ArrowUp'])    dz += SPD * dt;
+  if (keys['KeyS'] || keys['ArrowDown'])  dz -= SPD * dt;
+  if (keys['KeyA'] || keys['ArrowLeft'])  dx -= SPD * dt;
+  if (keys['KeyD'] || keys['ArrowRight']) dx += SPD * dt;
 
-  if (joy.active) {
-    dx += (joy.dx / JOY_MAX) * speed * dt;
-    dz -= (joy.dy / JOY_MAX) * speed * dt;
-  }
-  if (keys['KeyW'] || keys['ArrowUp'])    dz += speed * dt;
-  if (keys['KeyS'] || keys['ArrowDown'])  dz -= speed * dt;
-  if (keys['KeyA'] || keys['ArrowLeft'])  dx -= speed * dt;
-  if (keys['KeyD'] || keys['ArrowRight']) dx += speed * dt;
+  if (dx !== 0) { _mX.copy(_r).multiplyScalar(dx); if (!blocked(_mX, WALL_M)) camera.position.addScaledVector(_r, dx); }
+  if (dz !== 0) { _mZ.copy(_f).multiplyScalar(dz); if (!blocked(_mZ, WALL_M)) camera.position.addScaledVector(_f, dz); }
 
-  if (dx !== 0 || dz !== 0) {
-    // Componente X (strafe)
-    _moveX.copy(_right).multiplyScalar(dx);
-    if (!wallBlocked(_moveX, WALL_MARGIN)) {
-      camera.position.addScaledVector(_right, dx);
-    }
-    // Componente Z (adelante/atrás)
-    _moveZ.copy(_fwd).multiplyScalar(dz);
-    if (!wallBlocked(_moveZ, WALL_MARGIN)) {
-      camera.position.addScaledVector(_fwd, dz);
-    }
-  }
-
-  // Gravedad — anclar al suelo real de la cabaña
-  applyFloor();
+  stickToFloor();
 }
 
-// ─── Fuego ────────────────────────────────────────────────────
-let fireT = 0;
-function updateFire(dt) {
-  fireT += dt;
-  fireLight.intensity = 2.2 + Math.sin(fireT * 7.3) * 0.4 + Math.sin(fireT * 13.1) * 0.2;
+/* ═══════════════════════════════════════════════════════════
+   PROXIMIDAD Y BOTÓN HABLAR
+═══════════════════════════════════════════════════════════ */
+function checkProx() {
+  if (!charWrap || chatOpen) return;
+  const d = camera.position.distanceTo(charWrap.position);
+  $talkBtn.style.display = d < 3.2 ? 'block' : 'none';
 }
 
-// ─── Loop ─────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════
+   FUEGO + LOOP
+═══════════════════════════════════════════════════════════ */
+let fT = 0;
+function updateFire(dt) { fT += dt; fireLight.intensity = 2.8 + Math.sin(fT*7.2)*.5 + Math.sin(fT*13.3)*.2; }
+
 const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
   const dt = clock.getDelta();
   if (mixer) mixer.update(dt);
   updateFire(dt);
-  updateProceduralAvatar(dt);
-  updateCharacterAI(dt);
-  updateCamera(dt);
-  checkProximity();
+  updatePlaceholder(dt);
+  updateCharAI(dt);
+  moveCamera(dt);
+  checkProx();
   renderer.render(scene, camera);
 }
 
-// ─── Init ─────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════ */
 (async () => {
   try {
-    await loadCabin();
-    const { avatarScene, clips } = await loadAvatar();
-    setupAvatarAnimations(avatarScene, clips || []);
-    setProgress(100, '¡Listo!');
-    await new Promise(r => setTimeout(r, 500));
-    hideLoading();
+    const { center, size } = await loadCabin();
+    buildWaypoints(center, size);
+    await loadAvatar(center);
+    setP(100, '¡Listo!');
+    await new Promise(r => setTimeout(r, 400));
+    // Ocultar loading
+    const ld = document.getElementById('loading');
+    ld.style.transition = 'opacity .6s'; ld.style.opacity = '0';
+    setTimeout(() => ld.style.display = 'none', 700);
     animate();
-  } catch (err) {
-    $loadStatus.textContent = 'Error: ' + err.message;
-    console.error(err);
+  } catch (e) {
+    document.getElementById('load-label').textContent = 'Error: ' + e.message;
+    console.error(e);
   }
 })();
 </script>
