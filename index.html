@@ -127,6 +127,7 @@
 import * as THREE from 'three';
 import { GLTFLoader }      from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader }     from 'three/addons/loaders/DRACOLoader.js';
+import { FBXLoader }       from 'three/addons/loaders/FBXLoader.js';
 import * as SkeletonUtils  from 'three/addons/utils/SkeletonUtils.js';
 import { OrbitControls }   from 'three/addons/controls/OrbitControls.js';
 
@@ -134,8 +135,7 @@ import { OrbitControls }   from 'three/addons/controls/OrbitControls.js';
    ▼▼▼  CONFIGURA AQUÍ  ▼▼▼
    ═══════════════════════════════════════════════════════════════ */
 
-const RPM_AVATAR_URL = 'https://models.readyplayer.me/TU_ID_AQUI.glb?morphTargets=ARKit&lod=1';
-// Obtén tu ID en https://readyplayer.me — ejemplo: 6835abc123def456789
+const AVATAR_URL = 'RECURSOS/Vinayagar.fbx';
 
 const WORKER_URL     = 'https://empty-silence-364e.joniturbu.workers.dev/';
 // Cloudflare Worker que proxea Groq — la API key vive en el Worker, no aquí
@@ -325,30 +325,29 @@ async function loadCabin() {
   });
 }
 
-// ─── Carga del avatar RPM ─────────────────────────────────────
+// ─── Carga del avatar (FBX) ────────────────────────────────────
 async function loadAvatar() {
   setProgress(42, 'Cargando avatar…');
-  return new Promise((resolve, reject) => {
-    loader.load(
-      RPM_AVATAR_URL,
-      (gltf) => {
-        const avatarScene = gltf.scene;
-        const wrapper     = new THREE.Group();
-        wrapper.position.set(0, 0, 0.4);     // ligeramente hacia cámara
-        wrapper._inner = avatarScene;
-        avatarScene.scale.setScalar(1);
-        avatarScene.rotation.y = Math.PI;    // mirar a cámara
-        avatarScene.traverse(node => {
+  const fbxLoader = new FBXLoader();
+  return new Promise((resolve) => {
+    fbxLoader.load(
+      AVATAR_URL,
+      (object) => {
+        const wrapper = new THREE.Group();
+        wrapper.position.set(0, 0, 0.4);
+        object.scale.setScalar(0.01);        // FBX de Mixamo viene en cm → convertir a m
+        object.rotation.y = Math.PI;
+        object.traverse(node => {
           if (node.isMesh) {
             node.castShadow    = true;
             node.receiveShadow = true;
           }
         });
-        wrapper.add(avatarScene);
+        wrapper.add(object);
         scene.add(wrapper);
-        mixer = new THREE.AnimationMixer(avatarScene);
+        mixer = new THREE.AnimationMixer(object);
         setProgress(70, 'Avatar cargado');
-        resolve({ wrapper, avatarScene, clips: gltf.animations });
+        resolve({ wrapper, avatarScene: object, clips: object.animations });
       },
       (xhr) => {
         if (xhr.total) {
@@ -357,7 +356,7 @@ async function loadAvatar() {
         }
       },
       (err) => {
-        console.warn('Avatar RPM no cargado (¿has puesto tu ID?):', err.message);
+        console.warn('Avatar FBX no cargado:', err.message);
         createPlaceholderAvatar();
         setProgress(70, 'Avatar (placeholder)');
         resolve({ wrapper: null, avatarScene: null, clips: [] });
