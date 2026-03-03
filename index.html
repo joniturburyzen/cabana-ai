@@ -102,6 +102,55 @@
     }
     #send-btn:hover { background: rgba(232,200,122,.35); }
     #send-btn:disabled { opacity: .4; cursor: default; }
+
+    /* ─── Chat oculto por defecto — se abre con E ─────────── */
+    #chat-panel { display: none; }
+
+    /* ─── Crosshair ──────────────────────────────────────── */
+    #crosshair {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 18px; height: 18px; z-index: 5;
+      pointer-events: none; display: none;
+    }
+    #crosshair::before, #crosshair::after {
+      content: ''; position: absolute;
+      background: rgba(255,255,255,.75);
+    }
+    #crosshair::before { width: 2px; height: 100%; left: 50%; transform: translateX(-50%); }
+    #crosshair::after  { height: 2px; width: 100%; top: 50%;  transform: translateY(-50%); }
+
+    /* ─── Prompt "Pulsa E para hablar" ───────────────────── */
+    #interact-prompt {
+      position: fixed; bottom: 38%; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,.65);
+      color: #e8c87a; padding: 8px 18px;
+      border-radius: 8px; border: 1px solid rgba(232,200,122,.3);
+      font-size: .88rem; pointer-events: none;
+      display: none; z-index: 5;
+    }
+    #interact-prompt kbd {
+      background: rgba(232,200,122,.2); padding: 1px 7px;
+      border-radius: 4px; font-family: inherit;
+    }
+
+    /* ─── Instrucciones iniciales ────────────────────────── */
+    #instructions {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,.8);
+      color: #e8c87a; padding: 28px 36px;
+      border-radius: 14px; border: 1px solid rgba(232,200,122,.2);
+      text-align: center; z-index: 20;
+      pointer-events: none; transition: opacity .8s;
+    }
+    #instructions h2 { margin-bottom: 14px; font-size: 1.1rem; letter-spacing: .08em; }
+    #instructions p  { margin: 5px 0; font-size: .88rem; color: #c4a060; }
+    #instructions kbd {
+      background: rgba(232,200,122,.15); padding: 1px 7px;
+      border-radius: 4px; font-family: inherit; color: #e8c87a;
+    }
   </style>
 </head>
 <body>
@@ -111,6 +160,18 @@
   <h1>Cabaña AI</h1>
   <p id="load-status">Iniciando…</p>
   <div id="bar-wrap"><div id="bar"></div></div>
+</div>
+
+<!-- ═══ HUD ══════════════════════════════════════════════════════ -->
+<div id="crosshair"></div>
+<div id="interact-prompt">Pulsa <kbd>E</kbd> para hablar</div>
+<div id="instructions">
+  <h2>Cabaña AI</h2>
+  <p><kbd>Click</kbd> — capturar ratón / moverse</p>
+  <p><kbd>W A S D</kbd> — caminar</p>
+  <p><kbd>Ratón</kbd> — mirar alrededor</p>
+  <p><kbd>E</kbd> — hablar con el personaje (acércate)</p>
+  <p><kbd>ESC</kbd> — cerrar chat / soltar ratón</p>
 </div>
 
 <!-- ═══ Chat panel ══════════════════════════════════════════════ -->
@@ -129,7 +190,6 @@ import { GLTFLoader }      from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader }     from 'three/addons/loaders/DRACOLoader.js';
 import { FBXLoader }       from 'three/addons/loaders/FBXLoader.js';
 import * as SkeletonUtils  from 'three/addons/utils/SkeletonUtils.js';
-import { OrbitControls }   from 'three/addons/controls/OrbitControls.js';
 
 /* ═══════════════════════════════════════════════════════════════
    ▼▼▼  CONFIGURA AQUÍ  ▼▼▼
@@ -153,6 +213,7 @@ const $loading    = document.getElementById('loading');
 const $messages   = document.getElementById('messages');
 const $input      = document.getElementById('user-input');
 const $sendBtn    = document.getElementById('send-btn');
+const $chatPanel  = document.getElementById('chat-panel');
 
 function setProgress(pct, label) {
   $bar.style.width = pct + '%';
@@ -209,12 +270,95 @@ dirLight.position.set(2, 4, 2);
 dirLight.castShadow = true;
 scene.add(dirLight);
 
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 1.2, 0);
-controls.minDistance = 1;
-controls.maxDistance = 12;
-controls.maxPolarAngle = Math.PI * 0.85;
-controls.update();
+// ─── Primera persona — estado ──────────────────────────────────
+const CHARACTER_POS = new THREE.Vector3(0, 1.0, 0.4);
+const INTERACT_DIST = 3.0;
+
+let yaw   = Math.PI;   // mirando hacia el personaje al inicio
+let pitch = 0;
+let pointerLocked = false;
+let chatOpen      = false;
+const keys = {};
+
+const $crosshair       = document.getElementById('crosshair');
+const $interactPrompt  = document.getElementById('interact-prompt');
+const $instructions    = document.getElementById('instructions');
+
+// Capturar ratón al hacer click en el canvas
+renderer.domElement.addEventListener('click', () => {
+  if (!chatOpen) renderer.domElement.requestPointerLock();
+});
+
+document.addEventListener('pointerlockchange', () => {
+  pointerLocked = document.pointerLockElement === renderer.domElement;
+  $crosshair.style.display = pointerLocked ? 'block' : 'none';
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!pointerLocked || chatOpen) return;
+  yaw   -= e.movementX * 0.0018;
+  pitch -= e.movementY * 0.0018;
+  pitch  = Math.max(-Math.PI * 0.38, Math.min(Math.PI * 0.38, pitch));
+});
+
+document.addEventListener('keydown', (e) => {
+  keys[e.code] = true;
+  if (e.code === 'KeyE' && document.activeElement !== $input) toggleChat();
+  if (e.code === 'Escape') {
+    if (chatOpen) closeChat();
+    else document.exitPointerLock();
+  }
+});
+document.addEventListener('keyup',  (e) => { keys[e.code] = false; });
+
+function openChat() {
+  chatOpen = true;
+  document.exitPointerLock();
+  $chatPanel.style.display = 'flex';
+  setTimeout(() => $input.focus(), 50);
+}
+function closeChat() {
+  chatOpen = false;
+  $chatPanel.style.display = 'none';
+}
+function toggleChat() {
+  if (chatOpen) { closeChat(); return; }
+  const dist = camera.position.distanceTo(CHARACTER_POS);
+  if (dist <= INTERACT_DIST) openChat();
+}
+
+// ─── Movimiento WASD ───────────────────────────────────────────
+const _fwd   = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
+
+function updateMovement(dt) {
+  _euler.set(pitch, yaw, 0);
+  camera.rotation.copy(_euler);
+
+  if (!pointerLocked || chatOpen) return;
+  const speed = 2.5;
+  _fwd.set(  -Math.sin(yaw), 0, -Math.cos(yaw));
+  _right.set( Math.cos(yaw), 0, -Math.sin(yaw));  // perpendicular derecha
+
+  if (keys['KeyW'] || keys['ArrowUp'])    camera.position.addScaledVector(_fwd,   speed * dt);
+  if (keys['KeyS'] || keys['ArrowDown'])  camera.position.addScaledVector(_fwd,  -speed * dt);
+  if (keys['KeyA'] || keys['ArrowLeft'])  camera.position.addScaledVector(_right, -speed * dt);
+  if (keys['KeyD'] || keys['ArrowRight']) camera.position.addScaledVector(_right,  speed * dt);
+
+  // Limitar dentro de la cabaña
+  camera.position.x = Math.max(-4, Math.min(4, camera.position.x));
+  camera.position.z = Math.max(-4, Math.min(5, camera.position.z));
+  camera.position.y = 1.65;
+}
+
+// ─── Proximidad al personaje ───────────────────────────────────
+function checkProximity() {
+  const dist = camera.position.distanceTo(CHARACTER_POS);
+  const cerca = dist <= INTERACT_DIST;
+  $interactPrompt.style.display = (cerca && !chatOpen) ? 'block' : 'none';
+  if (!cerca && chatOpen) closeChat();
+}
 
 window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
@@ -457,7 +601,8 @@ function animate() {
   if (mixer) mixer.update(dt);
   updateFire(dt);
   updateProceduralAvatar(dt);
-  controls.update();
+  updateMovement(dt);
+  checkProximity();
   renderer.render(scene, camera);
 }
 
@@ -471,12 +616,11 @@ function animate() {
     await new Promise(r => setTimeout(r, 500));
     hideLoading();
     animate();
-    // Mensaje de bienvenida
+    // Instrucciones: aparecen 5s y se desvanecen
     setTimeout(() => {
-      const greeting = chatHistory.find(m => m.role === 'system') ? null : null;
-      // pequeño ping visual
-      addMessage('…bienvenido a la cabaña.', 'avatar');
-    }, 800);
+      $instructions.style.opacity = '0';
+      setTimeout(() => $instructions.style.display = 'none', 900);
+    }, 5000);
   } catch (err) {
     $loadStatus.textContent = 'Error: ' + err.message;
     console.error(err);
