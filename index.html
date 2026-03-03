@@ -178,8 +178,8 @@ const SYSTEM_PROMPT = `Eres un espíritu antiguo llamado Vinayagar que habita es
 Eres sabio, enigmático y amable. Respondes en español, con frases breves y evocadoras.
 Máximo 2-3 oraciones.`;
 
-// Límites de la cabaña (ajustar si es necesario)
-const BOUNDS = { minX: -4, maxX: 4, minZ: -4, maxZ: 4 };
+const EYE_HEIGHT  = 1.5;   // altura de ojos sobre el suelo
+const WALL_MARGIN = 0.35;  // distancia mínima a paredes
 
 // Puntos de patrulla del personaje dentro de la cabaña
 const WAYPOINTS = [
@@ -268,6 +268,36 @@ const draco = new DRACOLoader();
 draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/libs/draco/');
 const gltfLoader = new GLTFLoader();
 gltfLoader.setDRACOLoader(draco);
+
+// ─── Colisión con geometría real de la cabaña ─────────────────
+const cabinMeshes = [];
+const raycaster   = new THREE.Raycaster();
+const _gravDir    = new THREE.Vector3(0, -1, 0);
+const _gravOrigin = new THREE.Vector3();
+const _wallDir    = new THREE.Vector3();
+let   floorY      = 0;   // se actualiza cuando se detecta el suelo
+
+function applyFloor() {
+  if (!cabinMeshes.length) { camera.position.y = EYE_HEIGHT + floorY; return; }
+  _gravOrigin.set(camera.position.x, camera.position.y + 1.0, camera.position.z);
+  raycaster.set(_gravOrigin, _gravDir);
+  raycaster.far = 6;
+  const hits = raycaster.intersectObjects(cabinMeshes, false);
+  if (hits.length) {
+    floorY = hits[0].point.y;
+    camera.position.y = floorY + EYE_HEIGHT;
+  } else {
+    camera.position.y = floorY + EYE_HEIGHT; // mantiene último suelo conocido
+  }
+}
+
+function wallBlocked(dir, margin) {
+  if (!cabinMeshes.length) return false;
+  _wallDir.copy(dir).normalize();
+  raycaster.set(camera.position, _wallDir);
+  raycaster.far = margin;
+  return raycaster.intersectObjects(cabinMeshes, false).length > 0;
+}
 
 // ─── Estado del personaje ─────────────────────────────────────
 let characterWrapper = null;   // Group que se mueve por la cabaña
@@ -373,7 +403,12 @@ async function loadCabin() {
     gltfLoader.load('RECURSOS/caba%C3%B1apruebainterior.glb',
       (gltf) => {
         const cabin = gltf.scene;
-        cabin.traverse(n => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
+        cabin.traverse(n => {
+          if (n.isMesh) {
+            n.castShadow = true; n.receiveShadow = true;
+            cabinMeshes.push(n);
+          }
+        });
         scene.add(cabin);
         setProgress(40, 'Cabaña lista');
         resolve();
@@ -574,9 +609,11 @@ window.addEventListener('mousemove', (e) => {
   lastMX = e.clientX; lastMY = e.clientY;
 });
 
-// ─── Movimiento de cámara ─────────────────────────────────────
+// ─── Movimiento de cámara con colisiones ─────────────────────
 const _fwd   = new THREE.Vector3();
 const _right = new THREE.Vector3();
+const _moveX = new THREE.Vector3();
+const _moveZ = new THREE.Vector3();
 
 function updateCamera(dt) {
   camera.rotation.set(camPitch, camYaw, 0, 'YXZ');
@@ -584,26 +621,35 @@ function updateCamera(dt) {
 
   const speed = 2.8;
   _fwd.set(-Math.sin(camYaw), 0, -Math.cos(camYaw));
-  _right.set(Math.cos(camYaw), 0, -Math.sin(camYaw));
+  _right.set( Math.cos(camYaw), 0, -Math.sin(camYaw));
 
-  // Joystick táctil
-  if (joy.active && joy.dx !== 0 || joy.dy !== 0) {
-    const nx = joy.dx / JOY_MAX;
-    const ny = joy.dy / JOY_MAX;
-    camera.position.addScaledVector(_fwd,   -ny * speed * dt);
-    camera.position.addScaledVector(_right,  nx * speed * dt);
+  // Calcular delta de movimiento deseado
+  let dx = 0, dz = 0;
+
+  if (joy.active) {
+    dx += (joy.dx / JOY_MAX) * speed * dt;
+    dz -= (joy.dy / JOY_MAX) * speed * dt;
+  }
+  if (keys['KeyW'] || keys['ArrowUp'])    dz += speed * dt;
+  if (keys['KeyS'] || keys['ArrowDown'])  dz -= speed * dt;
+  if (keys['KeyA'] || keys['ArrowLeft'])  dx -= speed * dt;
+  if (keys['KeyD'] || keys['ArrowRight']) dx += speed * dt;
+
+  if (dx !== 0 || dz !== 0) {
+    // Componente X (strafe)
+    _moveX.copy(_right).multiplyScalar(dx);
+    if (!wallBlocked(_moveX, WALL_MARGIN)) {
+      camera.position.addScaledVector(_right, dx);
+    }
+    // Componente Z (adelante/atrás)
+    _moveZ.copy(_fwd).multiplyScalar(dz);
+    if (!wallBlocked(_moveZ, WALL_MARGIN)) {
+      camera.position.addScaledVector(_fwd, dz);
+    }
   }
 
-  // Teclado (desktop)
-  if (keys['KeyW'] || keys['ArrowUp'])    camera.position.addScaledVector(_fwd,   speed * dt);
-  if (keys['KeyS'] || keys['ArrowDown'])  camera.position.addScaledVector(_fwd,  -speed * dt);
-  if (keys['KeyA'] || keys['ArrowLeft'])  camera.position.addScaledVector(_right, -speed * dt);
-  if (keys['KeyD'] || keys['ArrowRight']) camera.position.addScaledVector(_right,  speed * dt);
-
-  // Clampar dentro de la cabaña
-  camera.position.x = Math.max(BOUNDS.minX, Math.min(BOUNDS.maxX, camera.position.x));
-  camera.position.z = Math.max(BOUNDS.minZ, Math.min(BOUNDS.maxZ, camera.position.z));
-  camera.position.y = 1.5; // altura fija — cámara flotante
+  // Gravedad — anclar al suelo real de la cabaña
+  applyFloor();
 }
 
 // ─── Fuego ────────────────────────────────────────────────────
