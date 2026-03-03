@@ -224,38 +224,27 @@ async function loadCabin() {
     gltfL.load('RECURSOS/caba%C3%B1apruebainterior.glb', (gltf) => {
       const cabin = gltf.scene;
 
-      // — Escala forzada: el eje más largo de la planta = 14 m
-      const raw  = new THREE.Box3().setFromObject(cabin);
-      const sz   = raw.getSize(new THREE.Vector3());
-      const maxD = Math.max(sz.x, sz.z);
-      if (maxD > 0.001) cabin.scale.setScalar(14 / maxD);
-
-      // — Suelo a y = 0
-      const box2 = new THREE.Box3().setFromObject(cabin);
-      cabin.position.y -= box2.min.y;
-
+      // — Escala 1:1 — la cabaña ya está en metros, no tocar
       cabin.traverse(n => {
         if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; colMeshes.push(n); }
       });
       scene.add(cabin);
 
-      // Bounds finales
-      cabinBounds.setFromObject(cabin);
-      const c  = cabinBounds.getCenter(new THREE.Vector3());
-      const s2 = cabinBounds.getSize(new THREE.Vector3());
+      // Coordenadas del interior reales (analizadas del GLB):
+      // Suelo: y≈2.6  Techo: y≈7.5  X: -6.6→6.5  Z: -9.6→-3.3
+      const FLOOR  = 2.6;
+      const CX     = 0.5;    // centro X de la habitación
+      const CZ     = -6.5;   // centro Z
 
-      console.log('Cabin bounds:', JSON.stringify({
-        cx: c.x.toFixed(2), cy: c.y.toFixed(2), cz: c.z.toFixed(2),
-        sx: s2.x.toFixed(2), sy: s2.y.toFixed(2), sz: s2.z.toFixed(2)
-      }));
+      groundY = FLOOR;
+      camera.position.set(CX, FLOOR + EYE_H, -4.2);  // entrada mirando al interior
+      camYaw   = Math.PI;    // mirando hacia z negativo (dentro)
+      camPitch = -0.06;
 
-      fireLight.position.set(c.x - s2.x * 0.28, 1.4, c.z - s2.z * 0.28);
+      fireLight.position.set(-1.5, FLOOR + 1.4, -8.5); // cerca de la estufa
 
-      // Cámara al centro exacto de la planta, a ojo de altura
-      camera.position.set(c.x, cabinBounds.min.y + EYE_H, c.z);
-      groundY = cabinBounds.min.y;
-      camYaw  = Math.PI * 0.75;   // diagonal para ver la habitación
-      camPitch = -0.08;
+      const c  = new THREE.Vector3(CX, FLOOR, CZ);
+      const s2 = new THREE.Vector3(13, 5, 6.5);
 
       setP(42, 'Cabaña lista');
       res({ center: c, size: s2 });
@@ -283,20 +272,21 @@ const CHAR = { waitT: 0, rotY: 0, speed: 0.7 };
 const _toWP = new THREE.Vector3();
 
 function buildWaypoints(c, s) {
-  const mx = s.x * 0.32, mz = s.z * 0.32;
+  // Waypoints en el suelo real de la habitación (y = 2.6)
+  const y = c.y;
   waypoints = [
-    new THREE.Vector3(c.x - mx, 0, c.z - mz),
-    new THREE.Vector3(c.x + mx, 0, c.z - mz),
-    new THREE.Vector3(c.x + mx, 0, c.z + mz),
-    new THREE.Vector3(c.x - mx, 0, c.z + mz),
-    new THREE.Vector3(c.x,      0, c.z),
-    new THREE.Vector3(c.x - mx * 0.5, 0, c.z + mz * 0.6),
+    new THREE.Vector3(-2.0, y, -5.2),
+    new THREE.Vector3( 3.0, y, -5.5),
+    new THREE.Vector3( 3.5, y, -8.0),
+    new THREE.Vector3(-1.5, y, -8.2),
+    new THREE.Vector3( 0.5, y, -6.5),
+    new THREE.Vector3(-2.0, y, -4.5),
   ];
 }
 
 function createPlaceholder(center) {
   const g = new THREE.Group();
-  g.position.set(center.x, 0, center.z);
+  g.position.set(center.x, center.y, center.z);
   const mB = new THREE.MeshStandardMaterial({ color: 0x7755aa, emissive: 0x220033, roughness: 0.6 });
   const mH = new THREE.MeshStandardMaterial({ color: 0xcc9966, emissive: 0x221100, roughness: 0.5 });
   const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.52, 10), mB);
@@ -311,7 +301,7 @@ async function loadAvatar(center) {
   return new Promise(res => {
     fbxL.load('RECURSOS/Vinayagar.fbx', obj => {
       const w = new THREE.Group();
-      w.position.set(center.x, 0, center.z);
+      w.position.set(center.x, center.y, center.z); // center.y = FLOOR = 2.6
       obj.scale.setScalar(0.01);
       obj.traverse(n => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
       w.add(obj);
