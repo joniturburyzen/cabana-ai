@@ -144,14 +144,6 @@ const SYSTEM_PROMPT  = `Eres un personaje misterioso que vive en una cabaña en 
 Hablas de forma concisa, con cierto misticismo. Respondes en español.
 Máximo 2-3 oraciones por respuesta.`;
 
-// URL pública del paquete de animaciones Ready Player Me (Idle + Talking)
-const RPM_IDLE_ANIM_URL    = 'https://readyplayer.me/api/avatars/animations/idle.glb';
-const RPM_TALKING_ANIM_URL = 'https://readyplayer.me/api/avatars/animations/talking.glb';
-
-// Fallback: animaciones de Mixamo si las RPM no cargan
-const MIXAMO_IDLE_URL    = 'https://cdn.jsdelivr.net/gh/nicktarnold/RPM-animation-sample-files@main/idle.glb';
-const MIXAMO_TALKING_URL = 'https://cdn.jsdelivr.net/gh/nicktarnold/RPM-animation-sample-files@main/talking.glb';
-
 /* ═══════════════════════════════════════════════════════════════ */
 
 // ─── Utilidades de UI ──────────────────────────────────────────
@@ -237,25 +229,69 @@ dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.169.0/examples/
 const loader = new GLTFLoader();
 loader.setDRACOLoader(dracoLoader);
 
-// ─── Animaciones / mixer ───────────────────────────────────────
-let mixer      = null;
-let idleAction = null;
-let talkAction = null;
-let talkTimer  = null;
+// ─── Estado de animación ──────────────────────────────────────
+let mixer        = null;
+let idleAction   = null;
+let talkAction   = null;
+let talkTimer    = null;
+let avatarState  = 'idle';   // 'idle' | 'talking'
+let avatarHead   = null;     // referencia para animación procedural del placeholder
+let elapsedTime  = 0;
 
 function startTalking(textLength) {
-  if (!mixer || !talkAction) return;
-  const duration = Math.max(2, Math.min(textLength * 0.065, 8)); // 2–8 s
+  avatarState = 'talking';
+  const duration = Math.max(2, Math.min(textLength * 0.065, 8));
   clearTimeout(talkTimer);
-  if (idleAction) idleAction.crossFadeTo(talkAction, 0.3, false);
-  talkAction.reset().play();
+  if (mixer && idleAction && talkAction) {
+    idleAction.crossFadeTo(talkAction, 0.3, false);
+    talkAction.reset().play();
+  }
   talkTimer = setTimeout(stopTalking, duration * 1000);
 }
 
 function stopTalking() {
-  if (!mixer || !idleAction) return;
-  if (talkAction) talkAction.crossFadeTo(idleAction, 0.5, false);
-  idleAction.reset().play();
+  avatarState = 'idle';
+  if (mixer && idleAction && talkAction) {
+    talkAction.crossFadeTo(idleAction, 0.5, false);
+    idleAction.reset().play();
+  }
+}
+
+// ─── Placeholder cuando no hay avatar RPM configurado ─────────
+function createPlaceholderAvatar() {
+  const group = new THREE.Group();
+  group.position.set(0, 0, 0.4);
+
+  const mat     = new THREE.MeshStandardMaterial({ color: 0x7755aa, emissive: 0x220033, roughness: 0.6 });
+  const headMat = new THREE.MeshStandardMaterial({ color: 0xcc9966, emissive: 0x221100, roughness: 0.5 });
+
+  // Cuerpo
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.52, 10), mat);
+  torso.position.y = 1.28;
+  torso.castShadow = true;
+  group.add(torso);
+
+  // Cabeza
+  avatarHead = new THREE.Mesh(new THREE.SphereGeometry(0.14, 14, 10), headMat);
+  avatarHead.position.y = 1.72;
+  avatarHead.castShadow = true;
+  group.add(avatarHead);
+
+  scene.add(group);
+}
+
+// ─── Animación procedural del placeholder ─────────────────────
+function updateProceduralAvatar(dt) {
+  if (!avatarHead) return;
+  elapsedTime += dt;
+  if (avatarState === 'idle') {
+    avatarHead.position.y = 1.72 + Math.sin(elapsedTime * 1.1) * 0.007;
+    avatarHead.rotation.y = Math.sin(elapsedTime * 0.35) * 0.06;
+    avatarHead.rotation.z = 0;
+  } else {
+    avatarHead.position.y = 1.72 + Math.sin(elapsedTime * 9) * 0.018;
+    avatarHead.rotation.z = Math.sin(elapsedTime * 11) * 0.04;
+  }
 }
 
 // ─── Carga de la cabana ───────────────────────────────────────
@@ -321,47 +357,34 @@ async function loadAvatar() {
         }
       },
       (err) => {
-        console.warn('Avatar RPM no se pudo cargar:', err);
+        console.warn('Avatar RPM no cargado (¿has puesto tu ID?):', err.message);
+        createPlaceholderAvatar();
         setProgress(70, 'Avatar (placeholder)');
-        resolve({ wrapper: null, avatarScene: null, clips: [] }); // continúa sin avatar
+        resolve({ wrapper: null, avatarScene: null, clips: [] });
       }
     );
   });
 }
 
-// ─── Carga de animaciones RPM ─────────────────────────────────
-async function loadAnimation(url) {
-  return new Promise((resolve) => {
-    loader.load(url, (gltf) => resolve(gltf.animations), undefined, () => resolve([]));
-  });
-}
-
-async function loadAnimations(avatarScene) {
-  setProgress(72, 'Cargando animaciones…');
-
-  // Intenta RPM primero, luego fallback Mixamo
-  let idleClips    = await loadAnimation(RPM_IDLE_ANIM_URL);
-  let talkingClips = await loadAnimation(RPM_TALKING_ANIM_URL);
-
-  if (!idleClips.length)    idleClips    = await loadAnimation(MIXAMO_IDLE_URL);
-  if (!talkingClips.length) talkingClips = await loadAnimation(MIXAMO_TALKING_URL);
-
+// ─── Animaciones: se usan las del propio GLB del avatar si las trae ──
+function setupAvatarAnimations(avatarScene, clips) {
+  if (!avatarScene || !mixer || !clips.length) return;
   setProgress(90, 'Animaciones listas');
 
-  if (!avatarScene || !mixer) return;
+  // Busca clips por nombre (RPM suele incluir Idle y Talking)
+  const findClip = (keywords) => clips.find(c => keywords.some(k => c.name.toLowerCase().includes(k)));
 
-  if (idleClips.length) {
-    const clip   = SkeletonUtils.retargetClip(avatarScene, avatarScene, idleClips[0]);
-    idleAction   = mixer.clipAction(clip);
+  const idleClip = findClip(['idle', 'stand']);
+  const talkClip = findClip(['talk', 'speak', 'convers']);
+
+  if (idleClip) {
+    idleAction = mixer.clipAction(idleClip);
     idleAction.setLoop(THREE.LoopRepeat);
     idleAction.play();
   }
-
-  if (talkingClips.length) {
-    const clip   = SkeletonUtils.retargetClip(avatarScene, avatarScene, talkingClips[0]);
-    talkAction   = mixer.clipAction(clip);
+  if (talkClip) {
+    talkAction = mixer.clipAction(talkClip);
     talkAction.setLoop(THREE.LoopRepeat);
-    if (idleAction) talkAction.weight = 0;
   }
 }
 
@@ -434,6 +457,7 @@ function animate() {
   const dt = clock.getDelta();
   if (mixer) mixer.update(dt);
   updateFire(dt);
+  updateProceduralAvatar(dt);
   controls.update();
   renderer.render(scene, camera);
 }
@@ -442,8 +466,8 @@ function animate() {
 (async () => {
   try {
     await loadCabin();
-    const { avatarScene } = await loadAvatar();
-    await loadAnimations(avatarScene);
+    const { avatarScene, clips } = await loadAvatar();
+    setupAvatarAnimations(avatarScene, clips || []);
     setProgress(100, '¡Listo!');
     await new Promise(r => setTimeout(r, 500));
     hideLoading();
