@@ -154,9 +154,9 @@ document.body.insertBefore(renderer.domElement, document.body.firstChild);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0c0905);
-scene.fog = new THREE.Fog(0x0c0905, 6, 18);
+scene.fog = new THREE.Fog(0x0c0905, 10, 40);
 
-const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.05, 30);
+const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.05, 60);
 camera.rotation.order = 'YXZ';
 
 window.addEventListener('resize', () => {
@@ -224,41 +224,38 @@ async function loadCabin() {
     gltfL.load('RECURSOS/caba%C3%B1apruebainterior.glb', (gltf) => {
       const cabin = gltf.scene;
 
-      // — Auto-escala: queremos que la habitación mida ~8–10 m en su eje mayor
-      const raw = new THREE.Box3().setFromObject(cabin);
-      const sz  = raw.getSize(new THREE.Vector3());
+      // — Escala forzada: el eje más largo de la planta = 14 m
+      const raw  = new THREE.Box3().setFromObject(cabin);
+      const sz   = raw.getSize(new THREE.Vector3());
       const maxD = Math.max(sz.x, sz.z);
-      if (maxD > 0.01) {
-        const target = 9;
-        const s = target / maxD;
-        // Solo escalar si está muy desproporcionado (< 0.5× o > 3× del target)
-        if (s < 0.5 || s > 3) cabin.scale.setScalar(s);
-      }
+      if (maxD > 0.001) cabin.scale.setScalar(14 / maxD);
 
-      // — Bajar suelo a y = 0
+      // — Suelo a y = 0
       const box2 = new THREE.Box3().setFromObject(cabin);
       cabin.position.y -= box2.min.y;
 
       cabin.traverse(n => {
-        if (n.isMesh) {
-          n.castShadow = true; n.receiveShadow = true;
-          colMeshes.push(n);
-        }
+        if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; colMeshes.push(n); }
       });
       scene.add(cabin);
 
-      // Calcular bounds finales para waypoints y posición inicial de cámara
+      // Bounds finales
       cabinBounds.setFromObject(cabin);
-      const c = cabinBounds.getCenter(new THREE.Vector3());
+      const c  = cabinBounds.getCenter(new THREE.Vector3());
       const s2 = cabinBounds.getSize(new THREE.Vector3());
 
-      // Colocar luz de fuego en esquina interior
-      fireLight.position.set(c.x - s2.x * 0.3, 1.2, c.z - s2.z * 0.3);
+      console.log('Cabin bounds:', JSON.stringify({
+        cx: c.x.toFixed(2), cy: c.y.toFixed(2), cz: c.z.toFixed(2),
+        sx: s2.x.toFixed(2), sy: s2.y.toFixed(2), sz: s2.z.toFixed(2)
+      }));
 
-      // Posición inicial de cámara: dentro de la cabaña, mirando al centro
-      camera.position.set(c.x, EYE_H, c.z + s2.z * 0.3);
-      camYaw = Math.PI; camPitch = -0.05;
-      groundY = 0;
+      fireLight.position.set(c.x - s2.x * 0.28, 1.4, c.z - s2.z * 0.28);
+
+      // Cámara al centro exacto de la planta, a ojo de altura
+      camera.position.set(c.x, cabinBounds.min.y + EYE_H, c.z);
+      groundY = cabinBounds.min.y;
+      camYaw  = Math.PI * 0.75;   // diagonal para ver la habitación
+      camPitch = -0.08;
 
       setP(42, 'Cabaña lista');
       res({ center: c, size: s2 });
@@ -421,17 +418,34 @@ async function askGroq(text) {
   try {
     const r = await fetch(WORKER_URL, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: history, max_tokens: 200, temperature: 0.85 })
+      body: JSON.stringify({
+        query: text,                          // worker antiguo
+        model: 'llama-3.3-70b-versatile',    // worker nuevo
+        messages: history,
+        max_tokens: 200,
+        temperature: 0.85
+      })
     });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
-    const reply = d.choices[0].message.content.trim();
+
+    // Soporta worker antiguo { texto } y worker nuevo { choices }
+    let reply;
+    if (d.choices && d.choices[0]) {
+      reply = d.choices[0].message.content.trim();
+    } else if (d.texto) {
+      reply = d.texto;
+    } else {
+      throw new Error('Respuesta inesperada: ' + JSON.stringify(d).slice(0, 80));
+    }
+
     history.push({ role: 'assistant', content: reply });
     div.className = 'm a'; div.textContent = reply;
     document.getElementById('msgs').scrollTop = 9999;
     startTalking(reply.length);
   } catch (e) {
     div.className = 'm a'; div.textContent = '[Error: ' + e.message + ']';
+    console.error('askGroq error:', e);
   }
 }
 
